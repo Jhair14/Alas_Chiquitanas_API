@@ -11,9 +11,6 @@ const typeDefs = gql`
         obtenerReportes: [ReporteRapido]
         obtenerReporte(id: ID!): ReporteRapido
         
-        obtenerReportesIncendio: [ReporteIncendio]
-        obtenerReporteIncendio(id: ID!): ReporteIncendio
-        
         focosDeCalor(range: String): [FocoDeCalor]
         noticiasIncendios(max: Int): [Noticia]
         
@@ -100,22 +97,6 @@ const typeDefs = gql`
     type Ubicacion {
         type: String
         coordinates: [Float]
-    }
-    
-    type ReporteIncendio {
-        id: ID
-        usuarioid: Usuario
-        nombreIncidente: String
-        ubicacion: Ubicacion
-        controlado: Boolean
-        extension: String
-        condicionesClima: String
-        equiposEnUso: [String]
-        numeroBomberos: Int
-        necesitaMasBomberos: Boolean
-        apoyoExterno: String
-        comentarioAdicional: String
-        fechaCreacion: String
     }
     
     type Equipo {
@@ -216,18 +197,6 @@ const typeDefs = gql`
         cant_autoridades: Int
     }
     
-    input inputReporteIncendio {
-        nombreIncidente: String
-        controlado: Boolean!
-        extension: String!
-        condicionesClima: String!
-        equiposEnUso: [String]!
-        numeroBomberos: Int!
-        necesitaMasBomberos: Boolean!
-        apoyoExterno: String!
-        comentarioAdicional: String
-    }
-    
     input inputEquipo {
         nombre_equipo: String!
         lat: Float!
@@ -279,11 +248,6 @@ const typeDefs = gql`
         crearReporte(input: inputReporteRapido): ReporteRapido
         actualizarReporte(id: ID!, input: inputReporteRapido): ReporteRapido
         eliminarReporte(id: ID!): String
-        
-        #ReporteIncendio
-        crearReporteIncendio(input: inputReporteIncendio): ReporteIncendio
-        actualizarReporteIncendio(id: ID!, input: inputReporteIncendio): ReporteIncendio
-        eliminarReporteIncendio(id: ID!): String
         
         # Equipos
         crearEquipo(input: inputEquipo): Equipo

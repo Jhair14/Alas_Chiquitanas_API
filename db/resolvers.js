@@ -1,6 +1,5 @@
 const Usuario = require('../models/Usuario');
 const ReporteRapido = require('../models/Reporte_rapido');
-const ReporteIncendio = require('../models/Reporte_incendios');
 const Equipo = require('../models/Equipos');
 const MiembroEquipo = require('../models/MiembroEquipo');
 const Recurso = require('../models/Recurso');
@@ -103,29 +102,6 @@ const resolvers = {
                 throw new Error(`El reporte con ID: ${id} no existe`);
             }
             return reporte;
-        },
-
-        obtenerReportesIncendio: async () => {
-            try {
-                const reportes = await ReporteIncendio.find({}).populate('usuarioid');
-                return reportes;
-            } catch (error) {
-                console.log(error);
-                throw new Error('Error al obtener los reportes de incendio' + error);
-            }
-        },
-        obtenerReporteIncendio: async (_, { id }) => {
-            // Revisar si el reporte existe
-            try {
-                const reporte = await ReporteIncendio.findById(id).populate('usuarioid');
-                if (!reporte) {
-                    throw new Error(`El reporte de incendio con ID: ${id} no existe`);
-                }
-                return reporte;
-            } catch (error) {
-                console.log(error);
-                throw new Error('Error al obtener el reporte de incendio');
-            }
         },
         // Update the obtenerEquipos resolver in your resolvers.js file
         obtenerEquipos: async (_, __, ctx) => {
@@ -639,136 +615,6 @@ const resolvers = {
             } catch (error) {
                 console.log(error);
                 throw new Error('Error al eliminar el reporte');
-            }
-        },
-
-        crearReporteIncendio: async (_, { input }, ctx) => {
-            try {
-                const { lat, lng, ...restoDatos } = input;
-
-                // Crear el nuevo reporte con los datos recibidos
-                const nuevoReporte = new ReporteIncendio({
-                    ...restoDatos,
-                    // Si tienes ubicación geográfica, la puedes agregar aquí
-                    ubicacion: lat !== undefined && lng !== undefined ? {
-                        type: 'Point',
-                        coordinates: [lng, lat]
-                    } : undefined,
-                    usuarioid: ctx.usuario.id,
-                    fechaCreacion: new Date()
-                });
-
-                // Guardar reporte en BD
-                const reporteGuardado = await nuevoReporte.save();
-
-                // Obtener todos los usuarios admin para notificar
-                const admins = await Usuario.find({ rol: 'admin' }).select('email nombre');
-
-                if (admins.length > 0) {
-                    // Configurar nodemailer
-                    const transporter = nodemailer.createTransport({
-                        service: 'gmail',
-                        auth: {
-                            user: process.env.CORREO_APP,
-                            pass: process.env.PASS_CORREO_APP,
-                        }
-                    });
-
-                    // Construir contenido HTML del correo con los datos del reporte
-                    const reporteHtml = `
-                        <h2>Nuevo reporte de incendio recibido</h2>
-                        <p><strong>Reportado por el usuario:</strong> ${ctx.usuario.nombre}</p>
-                        <p><strong>Nombre del incidente:</strong> ${reporteGuardado.nombreIncidente || 'No especificado'}</p>
-                        <p><strong>Controlado:</strong> ${reporteGuardado.controlado ? 'Sí' : 'No'}</p>
-                        <p><strong>Extensión:</strong> ${reporteGuardado.extension}</p>
-                        <p><strong>Condiciones del clima:</strong> ${reporteGuardado.condicionesClima}</p>
-                        <p><strong>Equipos en uso:</strong> ${reporteGuardado.equiposEnUso?.join(', ') || 'Ninguno'}</p>
-                        <p><strong>Número de bomberos:</strong> ${reporteGuardado.numeroBomberos}</p>
-                        <p><strong>Necesita más bomberos:</strong> ${reporteGuardado.necesitaMasBomberos ? 'Sí' : 'No'}</p>
-                        <p><strong>Apoyo externo:</strong> ${reporteGuardado.apoyoExterno}</p>
-                        <p><strong>Comentario adicional:</strong> ${reporteGuardado.comentarioAdicional || 'Ninguno'}</p>
-                        <p><strong>Fecha de creación:</strong> ${reporteGuardado.fechaCreacion.toLocaleString()}</p>
-                        ${lat !== undefined && lng !== undefined ? `<p><strong>Ubicación:</strong> <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank">Ver en mapa</a></p>` : ''}
-                    `;
-
-                    // Enviar correo a cada admin
-                    for (const admin of admins) {
-                        await transporter.sendMail({
-                            from: `"Alas Chiquitanas" <${process.env.CORREO_APP}>`,
-                            to: admin.email,
-                            subject: `Nuevo reporte de incendio: ${reporteGuardado.nombreIncidente || 'Sin nombre'}`,
-                            html: reporteHtml,
-                        });
-                    }
-                }
-
-                return reporteGuardado;
-
-            } catch (error) {
-                console.log(error);
-                throw new Error('Error al crear el reporte de incendio');
-            }
-        },
-
-        actualizarReporteIncendio: async (_, { id, input }, ctx) => {
-            // Verificar que el reporte exista
-            let reporte = await ReporteIncendio.findById(id);
-            if (!reporte) {
-                throw new Error(`El reporte de incendio con ID: ${id} no existe`);
-            }
-
-            // Verificar permisos (solo el usuario que creó el reporte o un admin puede actualizarlo)
-            if (ctx.usuario && reporte.usuario.toString() !== ctx.usuario.id && ctx.usuario.rol !== 'admin') {
-                throw new Error("No tienes las credenciales para editar este reporte de incendio");
-            }
-
-            try {
-                // Preparar el objeto para actualizar
-                const { lat, lng, usuario, ...restoDatos } = input;
-                const datosActualizados = {
-                    ...restoDatos
-                };
-
-                // Solo actualizar usuario si se proporciona y existe
-                if (usuario) {
-                    const existeUsuario = await Usuario.findById(usuario);
-                    if (!existeUsuario) {
-                        throw new Error(`El usuario con ID: ${usuario} no existe`);
-                    }
-                    datosActualizados.usuario = usuario;
-                }
-
-                // Actualizar y retornar el nuevo documento
-                reporte = await ReporteIncendio.findOneAndUpdate(
-                    { _id: id },
-                    datosActualizados,
-                    { new: true }
-                ).populate('usuario');
-
-                return reporte;
-            } catch (error) {
-                console.log(error);
-                throw new Error('Error al actualizar el reporte de incendio');
-            }
-        },
-        eliminarReporteIncendio: async (_, { id }, ctx) => {
-            // Verificar que el reporte exista
-            const reporte = await ReporteIncendio.findById(id);
-            if (!reporte) {
-                throw new Error(`El reporte de incendio con ID: ${id} no existe`);
-            }
-
-            // Verificar permisos (solo el usuario que creó el reporte o un admin puede eliminarlo)
-            if (ctx.usuario && reporte.usuario.toString() !== ctx.usuario.id && ctx.usuario.rol !== 'admin') {
-                throw new Error("No tienes las credenciales para eliminar este reporte de incendio");
-            }
-
-            try {
-                await ReporteIncendio.findOneAndDelete({ _id: id });
-                return 'Reporte de incendio eliminado correctamente';
-            } catch (error) {
-                console.log(error);
-                throw new Error('Error al eliminar el reporte de incendio');
             }
         },
 
